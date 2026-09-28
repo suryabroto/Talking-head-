@@ -588,33 +588,78 @@ if (form) {
       console.error("Background Firestore save failed:", err);
     });
 
-    // 4. SILENT BACKGROUND POST TO MENTOR CALL API
-    const cleanMobile = mobileVal.replace(/\s+/g, ""); // remove spaces
-    const formattedContact = (cleanMobile.length === 10 && !cleanMobile.startsWith("+")) ? "+91" + cleanMobile : mobileVal;
+    // 4. SILENT BACKGROUND POST TO SALESMAX LEAD API
+    const urlParams = new URLSearchParams(window.location.search);
+    const enquirySource = urlParams.get("enquiry_source") || 
+                          urlParams.get("source") || 
+                          urlParams.get("utm_source") || 
+                          "yt-tamil-media";
 
-    fetch("https://book-your-mentor-call-backend.quiet-dew-3468.workers.dev", {
+    const enquirySource2 = urlParams.get("enquiry_source_2") || 
+                           urlParams.get("video") || 
+                           urlParams.get("video_name") || 
+                           urlParams.get("ref") || 
+                           "Google show";
+
+    // Format phone number and country code
+    let cleanPhone = mobileVal.replace(/[\s\-()]/g, "").trim();
+    let countryCode = "91";
+    let formattedPhone = cleanPhone;
+
+    if (cleanPhone.startsWith("+")) {
+      formattedPhone = cleanPhone;
+      if (cleanPhone.startsWith("+91")) {
+        countryCode = "91";
+      } else {
+        const match = cleanPhone.match(/^\+(\d{1,4})/);
+        if (match) countryCode = match[1];
+      }
+    } else if (cleanPhone.startsWith("0") && cleanPhone.length === 11) {
+      cleanPhone = cleanPhone.slice(1);
+      formattedPhone = "+91" + cleanPhone;
+      countryCode = "91";
+    } else if (cleanPhone.length === 10) {
+      formattedPhone = "+91" + cleanPhone;
+      countryCode = "91";
+    } else if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) {
+      formattedPhone = "+" + cleanPhone;
+      countryCode = "91";
+    } else {
+      formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : "+91" + cleanPhone;
+      countryCode = "91";
+    }
+
+    // Map qualification to employment status
+    const statusMap = {
+      "graduate": "Graduate",
+      "post-graduate": "Post Graduate",
+      "working-professional": "Working Professional",
+      "plus-two-completed": "Student",
+      "other": "Other"
+    };
+    const employmentStatus = statusMap[qualificationVal] || "Student";
+
+    const leadPayload = {
+      name: nameVal,
+      phone: formattedPhone,
+      enquiry_source: enquirySource,
+      enquiry_source_2: enquirySource2,
+      employment_status: employmentStatus,
+      country_code: countryCode
+    };
+
+    fetch("https://integration.pqa.salesmax.ai/salesmax/leads?token=6EWvR2AKWpUdkxx9HPM8Vg", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        name: nameVal,
-        contact: formattedContact,
-        qualification: qualificationVal || "",
-        preferred_time: "anytime",
-        consent: true,
-        form_mode: "conversational",
-        language: "tamil",
-        website_url: "",
-        utm_source_L1: "youtube-tamil",
-        utm_source_L2: "talking-head-prompt"
-      })
+      body: JSON.stringify(leadPayload)
     })
     .then(response => {
-      console.log("API save complete, status:", response.status);
+      console.log("SalesMax Lead API save complete, status:", response.status);
     })
     .catch((err) => {
-      console.error("API save failed:", err);
+      console.error("SalesMax Lead API save failed:", err);
     });
   });
 }
